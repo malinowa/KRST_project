@@ -1,0 +1,7 @@
+node_modules
+modules.xml
+vcs.xml
+jsLibraryMappings.xml
+KRST_project.iml
+package-lock.json
+.idea/.gitignore

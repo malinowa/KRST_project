@@ -10,12 +10,12 @@ import {NewPeer} from "./newPeer";
 
 dotenv.config();
 
+const httpHost: string = process.env.HTTP_HOST || "127.0.0.1";
 const httpPort: number = Number(process.env.HTTP_PORT) || 3001;
 const p2pPort: number = Number(process.env.P2P_PORT) || 6001;
 const initialPeers: string[] = process.env.PEERS ? process.env.PEERS.split(",") : [];
 const sockets: RemoteSocket[] = new Array<RemoteSocket>();
 let wsServer: Server;
-let wsClientPort: number;
 
 function initHttpServer(): void {
     const app: Express = express();
@@ -40,32 +40,39 @@ function initHttpServer(): void {
         })));
     });
 
+    app.post("/broadcast", (req: Request<{}, {}, Message>, res: Response) => {
+        broadcast(req.body);
+        res.send();
+    })
+
     app.listen(httpPort, () => console.log("Listening HTTP on port: " + httpPort));
 }
 
 function initP2PServer() {
-    wsServer = new WebSocket.Server({port: p2pPort});
-    wsServer.on("connection",
-        (ws: WebSocket) => {
-            // @ts-ignore
-            console.log("Connection event fired!", ws._socket.remoteAddress, ws._socket.remotePort);
-            // @ts-ignore
-            return initConnection(ws, ws._socket.remoteAddress, ws._socket.remotePort)
-        });
+    wsServer = new WebSocket.Server({host: httpHost, port: p2pPort});
+    wsServer.on("connection", (ws: WebSocket) => {
+        // @ts-ignore
+        return initConnection(ws, ws._socket.remoteAddress, ws._socket.remotePort)
+    });
     console.log("Listening P2P on port: " + p2pPort);
 }
 
 function initConnection(webSocket: WebSocket, address: string, port: number) {
-    // console.log("initConnection method called", address, port);
-    // let socket = new RemoteSocket(address, port, webSocket);
-    // if (socketAlreadyExists(socket)) {
-    //     return;
-    // }
+    AddSocketIfNotOnList(webSocket, address, port);
 
-    // sockets.push(socket);
     initMessageHandler(webSocket);
     initErrorHandler(webSocket);
-    // write(webSocket, {message: "initializedConnection", from: socket.getSocketAddress()});
+    
+    write(webSocket, new Message(MessageType.LOG_INFORMATION, `Initialized connection from ${httpHost}:${p2pPort}`));
+}
+
+function AddSocketIfNotOnList(webSocket: WebSocket, address: string, port: number) {
+    let socket = new RemoteSocket(address, port, webSocket);
+    if (socketAlreadyExists(socket)) {
+        return;
+    }
+
+    sockets.push(socket);
 }
 
 function socketAlreadyExists(remoteSocket: RemoteSocket) {
@@ -76,28 +83,16 @@ function socketAlreadyExists(remoteSocket: RemoteSocket) {
 }
 
 function initMessageHandler(ws: WebSocket) {
-    ws.on("message", (message: Message) => {        
-        console.log(message.toString());
+    ws.on("message", (message: Message) => {
         let parsedMessage = JSON.parse(message.toString());
         
-        switch (parsedMessage.type){
-            case MessageType.SERVER_PORT_NOTIFICATION:
-            {
-                const {clientPort, serverPort} = JSON.parse(parsedMessage.data);
-                console.log("UWAGA!!!", clientPort, serverPort);
-                
-                let socketToChange = sockets.find(s => s.port == clientPort);
-                if (typeof socketToChange === "undefined"){
-                    return;
-                }
-                
-                socketToChange.port = serverPort;
+        switch (parsedMessage.type) {
+            case MessageType.LOG_INFORMATION: {
+                console.log(parsedMessage.data)
             }
         }
     });
 }
-
-
 
 function initErrorHandler(ws: WebSocket) {
     const closeConnection = (ws: WebSocket) => {
@@ -114,24 +109,10 @@ function initErrorHandler(ws: WebSocket) {
 
 function connectToPeers(newPeers: string[]) {
     newPeers.forEach((peer) => {
-        let peerTokens = peer.split(':');
-        let address = peerTokens[1].replace("//", "");
-        let port = peerTokens[2];
-        
         const ws = new WebSocket(peer);
-        ws.on("open", (wsResponse: WebSocket) => {            
+        ws.on("open", () => {
             // @ts-ignore
-            console.log("initConnection on ConnectToPeers method called", ws._socket.remoteAddress, ws._socket.remotePort);
-            // @ts-ignore
-            initConnection(ws, address, port)
-            // @ts-ignore
-            console.log(ws._socket);
-            // @ts-ignore
-            console.log(ws._socket.remotePort);
-            
-            // @ts-ignore
-            let message = new Message(MessageType.SERVER_PORT_NOTIFICATION, JSON.stringify({clientPort: ws._socket.remotePort, serverPort: wsServer.options.port}));
-            write(ws, message);
+            initConnection(ws, ws._socket.remoteAddress, Number(ws._socket.remotePort))
         });
         ws.on("error", (error) => {
             console.log("Connection failed " + error);
@@ -139,12 +120,11 @@ function connectToPeers(newPeers: string[]) {
     });
 }
 
-// TODO Zdefniować lepszy typ
-function write(ws: WebSocket, message: any) {
+function write(ws: WebSocket, message: Message) {
     ws.send(JSON.stringify(message));
 }
 
-function broadcast(message: any) {
+function broadcast(message: Message) {
     sockets.forEach((socket) => write(socket.webSocket, message));
 }
 

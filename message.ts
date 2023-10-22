@@ -4,8 +4,8 @@ export enum MessageType {
     RESPONSE_BLOCKCHAIN= 2,
     QUERY_PENDING = 3,
     RESPONSE_PENDING= 4,
-    SERVER_PORT_NOTIFICATION = 5
-};
+    LOG_INFORMATION = 5
+}
 
 export class Message {
     type: MessageType;

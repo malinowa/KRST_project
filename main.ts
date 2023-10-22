@@ -4,9 +4,8 @@ import {Server, WebSocket} from "ws"
 import dotenv from 'dotenv';
 import colorizer from "json-colorizer";
 
-import {RemoteSocket} from "./remoteSocket";
-import {Message, MessageType} from "./message";
-import {NewPeer} from "./newPeer";
+import {RemoteSocket, NewPeer, Message, MessageType} from "./wrappers";
+import {Wallet} from "./wallet";
 
 dotenv.config();
 
@@ -40,8 +39,8 @@ function initHttpServer(): void {
         })));
     });
 
-    app.post("/broadcast", (req: Request<{}, {}, Message>, res: Response) => {
-        broadcast(req.body);
+    app.post("/broadcast", (req: Request<{}, {}, {data :string}>, res: Response) => {
+        broadcast(new Message(MessageType.LOG_INFORMATION, req.body.data));
         res.send();
     })
 

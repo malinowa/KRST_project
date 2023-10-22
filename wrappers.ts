@@ -1,19 +1,17 @@
 import {WebSocket} from "ws";
+import {ec} from "elliptic";
 
 export enum MessageType {
-    QUERY_LATEST = 0,
-    QUERY_ALL = 1,
-    RESPONSE_BLOCKCHAIN = 2,
-    QUERY_PENDING = 3,
-    RESPONSE_PENDING = 4,
-    LOG_INFORMATION = 5
+    LOG_INFORMATION = 5,
+    VERIFICATION_REQUEST = 6,
+    VERIFICATION_RESPONSE= 7   
 }
 
 export class Message {
     type: MessageType;
-    data: string;
+    data: string | boolean | Identity;
 
-    constructor(type: MessageType, data: string) {
+    constructor(type: MessageType, data: string | boolean | Identity) {
         this.type = type;
         this.data = data;
     }
@@ -42,5 +40,17 @@ export class NewPeer {
         this.httpPort = httpPort;
         this.p2pAddress = p2pAddress;
         this.p2pPort = p2pPort;
+    }
+}
+
+export class Identity {
+    message: string;
+    signature: ec.Signature;
+    publicKey: string;
+    
+    constructor(message: string, signature: ec.Signature, publicKey: string) {
+        this.message = message;
+        this.signature = signature;
+        this.publicKey = publicKey;
     }
 }

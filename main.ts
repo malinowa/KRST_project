@@ -4,7 +4,7 @@ import {Server, WebSocket} from "ws"
 import dotenv from 'dotenv';
 import colorizer from "json-colorizer";
 
-import {RemoteSocket, NewPeer, Message, MessageType} from "./wrappers";
+import {Identity, Message, MessageType, NewPeer, RemoteSocket} from "./wrappers";
 import {Wallet} from "./wallet";
 
 dotenv.config();
@@ -15,6 +15,7 @@ const p2pPort: number = Number(process.env.P2P_PORT) || 6001;
 const initialPeers: string[] = process.env.PEERS ? process.env.PEERS.split(",") : [];
 const sockets: RemoteSocket[] = new Array<RemoteSocket>();
 let wsServer: Server;
+const verificationResults: Map<RemoteSocket, boolean> = new Map();
 
 function initHttpServer(): void {
     const app: Express = express();
@@ -39,7 +40,7 @@ function initHttpServer(): void {
         })));
     });
 
-    app.post("/broadcast", (req: Request<{}, {}, {data :string}>, res: Response) => {
+    app.post("/broadcast", (req: Request<{}, {}, { data: string }>, res: Response) => {
         broadcast(new Message(MessageType.LOG_INFORMATION, req.body.data));
         res.send();
     })
@@ -61,7 +62,7 @@ function initConnection(webSocket: WebSocket, address: string, port: number) {
 
     initMessageHandler(webSocket);
     initErrorHandler(webSocket);
-    
+
     write(webSocket, new Message(MessageType.LOG_INFORMATION, `Initialized connection from ${httpHost}:${p2pPort}`));
 }
 
@@ -84,13 +85,42 @@ function socketAlreadyExists(remoteSocket: RemoteSocket) {
 function initMessageHandler(ws: WebSocket) {
     ws.on("message", (message: Message) => {
         let parsedMessage = JSON.parse(message.toString());
-        
+
         switch (parsedMessage.type) {
             case MessageType.LOG_INFORMATION: {
                 console.log(parsedMessage.data)
             }
+                break;
+            case MessageType.VERIFICATION_REQUEST: {
+                let request = parsedMessage.data as Identity;
+                let isValid = Wallet.verifySignature(request.message, request.signature, request.publicKey);
+                let responseMessage = new Message(MessageType.VERIFICATION_RESPONSE, isValid)
+
+                write(ws, responseMessage);
+            }
+                break;
+            case MessageType.VERIFICATION_RESPONSE: {
+                let result = parsedMessage.data as boolean;
+                verificationResults.set(getRemoteSocketByWebSocket(ws)!, result);
+                if (verificationResults.size == sockets.length) {
+                    let allResults = [...verificationResults.values()];
+                    let declinedCount = allResults.filter(r => !r).length;
+                    
+                    if (declinedCount >= Math.floor(sockets.length / 2) + 1) {
+                        console.log(`Closing websocket ${wsServer.options.host}: ${wsServer.options.port} due to invalid verification`);
+                        wsServer.close()
+                    }
+                }
+            }
+                break;
         }
     });
+}
+
+function getRemoteSocketByWebSocket(webSocket: WebSocket): RemoteSocket | undefined {
+    return sockets.find((socket) => {
+        return JSON.stringify(socket.webSocket) == JSON.stringify(webSocket);
+    })
 }
 
 function initErrorHandler(ws: WebSocket) {
@@ -111,12 +141,22 @@ function connectToPeers(newPeers: string[]) {
         const ws = new WebSocket(peer);
         ws.on("open", () => {
             // @ts-ignore
-            initConnection(ws, ws._socket.remoteAddress, Number(ws._socket.remotePort))
+            initConnection(ws, ws._socket.remoteAddress, Number(ws._socket.remotePort));
+            sendAuthorizationRequest();
         });
         ws.on("error", (error) => {
             console.log("Connection failed " + error);
         });
     });
+}
+
+function sendAuthorizationRequest() {
+    let messageToEncrypt = `ws://${wsServer.options.host}:${wsServer.options.port}`;
+    let signature = Wallet.sign(messageToEncrypt, wallet.getPrivateKey());
+    let identity = new Identity(messageToEncrypt, signature, wallet.getPublicKey());
+    let message = new Message(MessageType.VERIFICATION_REQUEST, identity)
+
+    broadcast(message);
 }
 
 function write(ws: WebSocket, message: Message) {
@@ -129,4 +169,5 @@ function broadcast(message: Message) {
 
 initHttpServer();
 initP2PServer();
+const wallet = new Wallet();
 connectToPeers(initialPeers);

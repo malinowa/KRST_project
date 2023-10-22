@@ -1,4 +1,4 @@
-import {ec, SignatureInput} from 'elliptic';
+import {ec} from 'elliptic';
 
 const ellipticCurve: ec = new ec("secp256k1")
 
@@ -22,7 +22,7 @@ export class Wallet {
         return keyPair.sign(message);
     }
 
-    static verifySignature(message: string, signature: SignatureInput, publicKey: string): boolean {
+    static verifySignature(message: string, signature: ec.Signature, publicKey: string): boolean {
         let keyPair = ellipticCurve.keyFromPublic(publicKey, "hex");
         if (!keyPair.verify(message, signature)) {
             console.log("verification error");

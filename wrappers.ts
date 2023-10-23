@@ -2,9 +2,9 @@ import {WebSocket} from "ws";
 import {ec} from "elliptic";
 
 export enum MessageType {
-    LOG_INFORMATION = 5,
-    VERIFICATION_REQUEST = 6,
-    VERIFICATION_RESPONSE= 7   
+    LOG_INFORMATION = 1,
+    VERIFICATION_REQUEST = 2,
+    VERIFICATION_RESPONSE = 3
 }
 
 export class Message {
@@ -28,6 +28,7 @@ export class RemoteSocket {
         this.webSocket = webSocket;
     }
 
+
     getSocketAddress = (): string => this.address + ":" + this.port;
 }
 
@@ -41,13 +42,27 @@ export class NewPeer {
         this.p2pAddress = p2pAddress;
         this.p2pPort = p2pPort;
     }
+
+    toWebSocketUrl(): string[] {
+        return [`ws://${this.p2pAddress}:${this.p2pPort}`]
+    }
+}
+
+export class P2PResponse {
+    host: string | undefined;
+    port: number | undefined;
+
+    constructor(host: string | undefined, port: number | undefined) {
+        this.host = host;
+        this.port = port;
+    }
 }
 
 export class Identity {
     message: string;
     signature: ec.Signature;
     publicKey: string;
-    
+
     constructor(message: string, signature: ec.Signature, publicKey: string) {
         this.message = message;
         this.signature = signature;

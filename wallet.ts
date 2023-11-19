@@ -4,9 +4,11 @@ const ellipticCurve: ec = new ec("secp256k1")
 
 export class Wallet {
     keyPair: ec.KeyPair;
+    mailAddress: string;
 
-    constructor() {
+    constructor(mailAddress: string) {
         this.keyPair = ellipticCurve.genKeyPair();
+        this.mailAddress = mailAddress;
     }
 
     getPublicKey(): string {

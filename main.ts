@@ -6,17 +6,15 @@ import colorizer from "json-colorizer";
 
 import {Identity, Message, MessageType, NewPeer, P2PResponse, RemoteSocket} from "./wrappers";
 import {Wallet} from "./wallet";
+import {Configuration} from "./configuration";
 
 dotenv.config();
 
-const httpHost: string = process.env.HTTP_HOST || "127.0.0.1";
-const httpPort: number = Number(process.env.HTTP_PORT) || 3001;
-const p2pPort: number = Number(process.env.P2P_PORT) || 6001;
-const initialPeers: string[] = process.env.PEERS ? process.env.PEERS.split(",") : [];
+const {httpPort, p2pPort, httpHost, initialPeers, mailAddress} = new Configuration();
 const sockets: RemoteSocket[] = new Array<RemoteSocket>();
-let wsServer: Server;
 const verificationResults: Map<RemoteSocket, boolean> = new Map();
-const wallet: Wallet = new Wallet();
+const wallet: Wallet = new Wallet(mailAddress);
+let wsServer: Server;
 
 function initHttpServer(): void {
     const app: Express = express();
@@ -46,6 +44,14 @@ function initHttpServer(): void {
         res.send();
         console.log(`Broadcasting message "${req.body.data}" from ${wsServer.options.host}:${wsServer.options.port}`)
     })
+
+    app.get("/wallet", (_: Request, res: Response) => {
+        res.send({publicKey: wallet.getPublicKey(), privateKey: wallet.getPrivateKey()});
+        console.log("Peers: " + colorizer(JSON.stringify({
+            publicKey: wallet.getPublicKey(),
+            privateKey: wallet.getPrivateKey()
+        })));
+    });
 
     app.listen(httpPort, () => console.log("Listening HTTP on port: " + httpPort));
 }

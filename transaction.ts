@@ -1,5 +1,5 @@
 import {Wallet} from "./wallet";
-import {SHA256} from "crypto-ts"
+import {createHash} from 'crypto'
 import {ec} from "elliptic";
 
 export class Transaction {
@@ -22,6 +22,8 @@ export class Transaction {
     }
 
     createHash(): string {
-        return SHA256(this.sender + this.receiver + this.amount + this.timestamp + this.message)
+        return createHash('sha256')
+            .update(this.sender + this.receiver + this.amount + this.timestamp + this.message)
+            .digest('hex');
     }
 }

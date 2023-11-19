@@ -1,5 +1,5 @@
 import {Transaction} from "./transaction";
-import {SHA256} from "crypto-ts"
+import {createHash} from "crypto";
 
 export class Block {
     timestamp: Date;
@@ -13,8 +13,23 @@ export class Block {
         this.previousHash = previousHash;
         this.timestamp = timestamp;
     }
-
+    
     generateHash(transactions: string): string {
-        return SHA256(this.previousHash + transactions + this.timestamp + this.nonce);
+        return createHash('sha256')
+            .update(this.previousHash + transactions + this.timestamp + this.nonce)
+            .digest('hex');
+    }
+
+    mine(difficulty: number) {
+        const transactionsString = JSON.stringify(this.transactions);
+        this.hash = this.generateHash(transactionsString);
+        const desiredBeginOfHash = Array(difficulty + 1).join("0");
+
+        while (this.hash.substring(0, difficulty) !== desiredBeginOfHash) {
+            console.log(this.hash);
+            this.nonce++;
+            this.hash = this.generateHash(transactionsString);
+        }
+        console.log("Final hash = " + this.hash);
     }
 }

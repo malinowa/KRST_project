@@ -7,6 +7,7 @@ import colorizer from "json-colorizer";
 import {Identity, Message, MessageType, NewPeer, P2PResponse, RemoteSocket} from "./wrappers";
 import {Wallet} from "./wallet";
 import {Configuration} from "./configuration";
+import {Blockchain} from "./blockchain";
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ const sockets: RemoteSocket[] = new Array<RemoteSocket>();
 const verificationResults: Map<RemoteSocket, boolean> = new Map();
 const wallet: Wallet = new Wallet(mailAddress);
 let wsServer: Server;
+const blockChain = new Blockchain(4, 10);
 
 function initHttpServer(): void {
     const app: Express = express();
@@ -51,6 +53,16 @@ function initHttpServer(): void {
             publicKey: wallet.getPublicKey(),
             privateKey: wallet.getPrivateKey()
         })));
+    });
+    
+    app.post('/mine',(_: Request, res: Response) => {
+        res.send({message: "Mining started"});
+        blockChain.mineBlock(mailAddress, wallet.getPrivateKey());
+    });
+    
+    app.get('/verifyIntegrity',(_: Request, res: Response) => {
+        const result = blockChain.verifyIntegrity();
+        res.send({message: "Integrity verification " + (result ? "succeeded" : "failed")});
     });
 
     app.listen(httpPort, () => console.log("Listening HTTP on port: " + httpPort));

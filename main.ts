@@ -16,7 +16,7 @@ const sockets: RemoteSocket[] = new Array<RemoteSocket>();
 const verificationResults: Map<RemoteSocket, boolean> = new Map();
 const wallet: Wallet = new Wallet(mailAddress);
 let wsServer: Server;
-const blockChain = new Blockchain(4, 10);
+const blockChain = new Blockchain(3, 10);
 
 function initHttpServer(): void {
     const app: Express = express();
@@ -56,8 +56,8 @@ function initHttpServer(): void {
     });
     
     app.post('/mine',(_: Request, res: Response) => {
-        res.send({message: "Mining started"});
         blockChain.mineBlock(mailAddress, wallet.getPrivateKey());
+        res.send({message: "Mining started"});
     });
     
     app.get('/verifyIntegrity',(_: Request, res: Response) => {

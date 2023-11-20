@@ -1,5 +1,7 @@
 import {Block} from "./block";
 import {Transaction} from "./transaction";
+import {ChildProcess, fork} from "child_process";
+import {ForkMessage} from "./messages";
 
 const GenesisBlock: Block = new Block([], "", new Date("November 19, 1335 15:00:00"));
 GenesisBlock.hash = GenesisBlock.generateHash(JSON.stringify([]));
@@ -11,6 +13,7 @@ export class Blockchain {
     difficulty: number;
     blockReward: number;
     awaitingTransactions: Transaction[] = new Array<Transaction>();
+    private worker: ChildProcess;
 
     constructor(difficulty: number, blockReward: number) {
         this.difficulty = difficulty;
@@ -25,8 +28,15 @@ export class Blockchain {
         const rewardTransaction = new Transaction(BlockchainAddress, minerAddress, this.blockReward, RewardMessage, privateKey);
         this.awaitingTransactions.push(rewardTransaction);
 
-        const block = new Block(this.awaitingTransactions, this.getLastBlock().hash);
-        block.mine(this.difficulty);
+        this.worker = fork('./miner.ts', {serialization: "advanced"});
+        console.log("New miner thread created")
+        let message = new ForkMessage(this.awaitingTransactions, this.getLastBlock().hash, this.difficulty);
+        this.worker.send(message.toString());
+        console.log("Data sent to miner thread")
+    }
+
+    stopMining() {
+        this.worker.kill();
     }
 
     verifyIntegrity(): boolean {

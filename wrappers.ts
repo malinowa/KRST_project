@@ -4,7 +4,8 @@ import {ec} from "elliptic";
 export enum MessageType {
     LOG_INFORMATION = 1,
     VERIFICATION_REQUEST = 2,
-    VERIFICATION_RESPONSE = 3
+    VERIFICATION_RESPONSE = 3,
+    BLOCK_MINED = 4
 }
 
 export class Message {

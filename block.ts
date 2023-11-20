@@ -2,18 +2,22 @@ import {Transaction} from "./transaction";
 import {createHash} from "crypto";
 
 export class Block {
-    timestamp: Date;
+    timestamp: string;
     transactions: Transaction[];
     nonce: number = 0;
     hash: string = "";
     previousHash: string;
 
-    constructor(transactions: Transaction[], previousHash: string, timestamp: Date = new Date()) {
+    constructor(transactions: Transaction[], previousHash: string, timestamp: string | undefined = undefined) {
         this.transactions = transactions;
         this.previousHash = previousHash;
-        this.timestamp = timestamp;
+        this.timestamp = timestamp === undefined ? (new Date()).toISOString() : timestamp;
     }
-    
+
+    generateVerificationHash(): string {
+        return this.generateHash(JSON.stringify(this.transactions));
+    }
+
     generateHash(transactions: string): string {
         return createHash('sha256')
             .update(this.previousHash + transactions + this.timestamp + this.nonce)
@@ -31,6 +35,25 @@ export class Block {
             this.nonce++;
             this.hash = this.generateHash(transactionsString);
         }
+        console.log(this.previousHash + transactionsString + this.timestamp + this.nonce)
         console.log("Final hash = " + this.hash);
+    }
+
+    toString() {
+        return JSON.stringify(
+            {
+                timestamp: this.timestamp,
+                transactions: this.transactions,
+                nonce: this.nonce,
+                hash: this.hash,
+                previousHash: this.previousHash
+            })
+    }
+    
+    static createBlock(block: Block) {
+        const newBlock = new Block(block.transactions, block.previousHash, block.timestamp);
+        newBlock.hash = block.hash;
+        newBlock.nonce = block.nonce;
+        return newBlock;
     }
 }

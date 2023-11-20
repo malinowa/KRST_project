@@ -8,6 +8,8 @@ import {Identity, Message, MessageType, NewPeer, P2PResponse, RemoteSocket} from
 import {Wallet} from "./wallet";
 import {Configuration} from "./configuration";
 import {Blockchain} from "./blockchain";
+import {Block} from "./block";
+import {fork} from "child_process";
 
 dotenv.config();
 
@@ -16,7 +18,7 @@ const sockets: RemoteSocket[] = new Array<RemoteSocket>();
 const verificationResults: Map<RemoteSocket, boolean> = new Map();
 const wallet: Wallet = new Wallet(mailAddress);
 let wsServer: Server;
-const blockChain = new Blockchain(3, 10);
+const blockChain = new Blockchain(5, 10);
 
 function initHttpServer(): void {
     const app: Express = express();
@@ -54,13 +56,24 @@ function initHttpServer(): void {
             privateKey: wallet.getPrivateKey()
         })));
     });
-    
-    app.post('/mine',(_: Request, res: Response) => {
+
+    app.post('/mine', (_: Request, res: Response) => {
+        blockChain.stopMining();
+        blockChain.worker = fork('./miner.ts', {serialization: "advanced"});
+        blockChain.worker.on('message', (message: string) => {
+            const parsedMessage = (JSON.parse(message) as Block);
+            const block = Block.createBlock(parsedMessage);
+            blockChain.pushBlock(block);
+
+            const messageToBroadcast = new Message(MessageType.BLOCK_MINED, message);
+            broadcast(messageToBroadcast);
+        })
+        
         blockChain.mineBlock(mailAddress, wallet.getPrivateKey());
         res.send({message: "Mining started"});
     });
-    
-    app.get('/verifyIntegrity',(_: Request, res: Response) => {
+
+    app.get('/verifyIntegrity', (_: Request, res: Response) => {
         const result = blockChain.verifyIntegrity();
         res.send({message: "Integrity verification " + (result ? "succeeded" : "failed")});
     });
@@ -119,6 +132,17 @@ function initMessageHandler(ws: WebSocket) {
                 handleVerificationResponse(remoteSocket, parsedMessage.data as boolean);
             }
                 break;
+            case MessageType.BLOCK_MINED: {
+                const block = Block.createBlock(JSON.parse(parsedMessage.data) as Block);
+                let verificationResult = blockChain.verifyBlock(block);
+                if (!verificationResult) {
+                    return;
+                }
+
+                blockChain.stopMining();
+                blockChain.pushBlock(block);
+                console.log(blockChain);
+            }
         }
     });
 }

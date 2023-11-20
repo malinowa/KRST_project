@@ -1,9 +1,9 @@
 import {Block} from "./block";
 import {Transaction} from "./transaction";
-import {ChildProcess, fork} from "child_process";
+import {ChildProcess} from "child_process";
 import {ForkMessage} from "./messages";
 
-const GenesisBlock: Block = new Block([], "", new Date("November 19, 1335 15:00:00"));
+const GenesisBlock: Block = new Block([], "", (new Date("November 19, 1335 15:00:00")).toISOString());
 GenesisBlock.hash = GenesisBlock.generateHash(JSON.stringify([]));
 const BlockchainAddress = "SYSTEM";
 const RewardMessage = "Here is your mining reward";
@@ -13,7 +13,7 @@ export class Blockchain {
     difficulty: number;
     blockReward: number;
     awaitingTransactions: Transaction[] = new Array<Transaction>();
-    private worker: ChildProcess;
+    worker: ChildProcess;
 
     constructor(difficulty: number, blockReward: number) {
         this.difficulty = difficulty;
@@ -28,15 +28,29 @@ export class Blockchain {
         const rewardTransaction = new Transaction(BlockchainAddress, minerAddress, this.blockReward, RewardMessage, privateKey);
         this.awaitingTransactions.push(rewardTransaction);
 
-        this.worker = fork('./miner.ts', {serialization: "advanced"});
-        console.log("New miner thread created")
         let message = new ForkMessage(this.awaitingTransactions, this.getLastBlock().hash, this.difficulty);
         this.worker.send(message.toString());
         console.log("Data sent to miner thread")
     }
 
+    pushBlock(block: Block) {
+        this.chain.push(block);
+    }
+
     stopMining() {
-        this.worker.kill();
+        if (this.worker !== undefined){
+            this.worker.kill();
+        }
+    }
+
+    verifyBlock(block: Block) {
+        const isHashCorrect = block.generateVerificationHash() === block.hash;
+        const isPreviousHashCorrect = this.getLastBlock().hash === block.previousHash;
+
+        const desiredBeginOfHash = Array(this.difficulty + 1).join("0");
+        const proofOfWorkResult = block.hash.substring(0, this.difficulty) === desiredBeginOfHash;
+
+        return isHashCorrect && isPreviousHashCorrect && proofOfWorkResult;
     }
 
     verifyIntegrity(): boolean {

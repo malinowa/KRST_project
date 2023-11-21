@@ -18,7 +18,7 @@ const sockets: RemoteSocket[] = new Array<RemoteSocket>();
 const verificationResults: Map<RemoteSocket, boolean> = new Map();
 const wallet: Wallet = new Wallet(mailAddress);
 let wsServer: Server;
-const blockChain = new Blockchain(5, 10);
+const blockChain = new Blockchain(4, 10);
 
 function initHttpServer(): void {
     const app: Express = express();
@@ -58,15 +58,17 @@ function initHttpServer(): void {
     });
 
     app.post('/mine', (_: Request, res: Response) => {
-        blockChain.stopMining();
         blockChain.worker = fork('./miner.ts', {serialization: "advanced"});
         blockChain.worker.on('message', (message: string) => {
             const parsedMessage = (JSON.parse(message) as Block);
             const block = Block.createBlock(parsedMessage);
             blockChain.pushBlock(block);
 
+            
             const messageToBroadcast = new Message(MessageType.BLOCK_MINED, message);
             broadcast(messageToBroadcast);
+            
+            blockChain.stopMining();
         })
         
         blockChain.mineBlock(mailAddress, wallet.getPrivateKey());
@@ -134,14 +136,12 @@ function initMessageHandler(ws: WebSocket) {
                 break;
             case MessageType.BLOCK_MINED: {
                 const block = Block.createBlock(JSON.parse(parsedMessage.data) as Block);
-                let verificationResult = blockChain.verifyBlock(block);
-                if (!verificationResult) {
+                if (!blockChain.verifyBlock(block)) {
                     return;
                 }
 
-                blockChain.stopMining();
                 blockChain.pushBlock(block);
-                console.log(blockChain);
+                blockChain.stopMining();
             }
         }
     });

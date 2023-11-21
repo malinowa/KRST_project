@@ -29,13 +29,11 @@ export class Block {
         this.hash = this.generateHash(transactionsString);
         const desiredBeginOfHash = Array(difficulty + 1).join("0");
 
-        console.log("Guessing hashes")
         while (this.hash.substring(0, difficulty) !== desiredBeginOfHash) {
             console.log(this.hash);
             this.nonce++;
             this.hash = this.generateHash(transactionsString);
         }
-        console.log(this.previousHash + transactionsString + this.timestamp + this.nonce)
         console.log("Final hash = " + this.hash);
     }
 

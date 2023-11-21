@@ -38,6 +38,8 @@ export class Blockchain {
     }
 
     stopMining() {
+        this.awaitingTransactions = [];
+        console.log(this.displayCurrentState());
         if (this.worker !== undefined){
             this.worker.kill();
         }
@@ -65,5 +67,14 @@ export class Blockchain {
             }
         }
         return true;
+    }
+
+    displayCurrentState() {
+        return {
+            chain: this.chain,
+            difficulty: this.difficulty,
+            blockReward: this.blockReward,
+            transactions: this.awaitingTransactions
+        }
     }
 }

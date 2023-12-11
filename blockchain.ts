@@ -2,6 +2,7 @@ import {Block} from "./block";
 import {Transaction} from "./transaction";
 import {ChildProcess} from "child_process";
 import {ForkMessage} from "./messages";
+import {OperationResult} from "./wrappers";
 
 const GenesisBlock: Block = new Block([], "", (new Date("November 19, 1335 15:00:00")).toISOString());
 GenesisBlock.hash = GenesisBlock.generateHash(JSON.stringify([]));
@@ -40,7 +41,7 @@ export class Blockchain {
     stopMining() {
         this.awaitingTransactions = [];
         console.log(this.displayCurrentState());
-        if (this.worker !== undefined){
+        if (this.worker !== undefined) {
             this.worker.kill();
         }
     }
@@ -67,6 +68,54 @@ export class Blockchain {
             }
         }
         return true;
+    }
+
+    addTransaction(transactionToAdd: Transaction): OperationResult {
+        //  - czy identyczna transakcja już nie istnieje
+        if (this.transactionExists(transactionToAdd.hash)) {
+            return OperationResult.Failure("Invalid transaction! Cannot add transaction that already exists");
+        }
+
+        //  - czy wysyłający ma odpowiednie środki
+        // let senderAccountBalance = this.getAccountBalance(transactionToAdd.sender);
+        // if (transactionToAdd.amount > senderAccountBalance) {
+        //     return OperationResult.Failure("Insufficient funds! Cannot add transaction when balance is only " + senderAccountBalance);
+        // }
+
+        //  - czy wysyłający nie wysyła do samego siebie (zbędna informacja do przechowywania w blockchainie)
+        if (transactionToAdd.sender === transactionToAdd.receiver) {
+            return OperationResult.Failure("Invalid transaction! Cannot send to yourself");
+        }
+
+        this.awaitingTransactions.push(transactionToAdd);
+        return OperationResult.Success();
+    }
+
+    getAccountBalance(mailAddress: string): number {
+        let balance = 0;
+        for (let block of this.chain) {
+            for (let trans of block.transactions) {
+                if (trans.sender === mailAddress) {
+                    balance -= trans.amount;
+                } else if (trans.receiver === mailAddress) {
+                    balance += trans.amount;
+                }
+            }
+        }
+
+        return balance;
+    }
+
+    transactionExists(hash: string): boolean {
+        for (let block of this.chain) {
+            for (let trans of block.transactions) {
+                if (trans.hash === hash) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     displayCurrentState() {

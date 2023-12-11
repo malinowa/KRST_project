@@ -10,6 +10,7 @@ import {Configuration} from "./configuration";
 import {Blockchain} from "./blockchain";
 import {Block} from "./block";
 import {fork} from "child_process";
+import {Transaction} from "./transaction";
 
 dotenv.config();
 
@@ -64,13 +65,13 @@ function initHttpServer(): void {
             const block = Block.createBlock(parsedMessage);
             blockChain.pushBlock(block);
 
-            
+
             const messageToBroadcast = new Message(MessageType.BLOCK_MINED, message);
             broadcast(messageToBroadcast);
-            
+
             blockChain.stopMining();
         })
-        
+
         blockChain.mineBlock(mailAddress, wallet.getPrivateKey());
         res.send({message: "Mining started"});
     });
@@ -79,6 +80,28 @@ function initHttpServer(): void {
         const result = blockChain.verifyIntegrity();
         res.send({message: "Integrity verification " + (result ? "succeeded" : "failed")});
     });
+
+    app.get('/balance', (req: Request<{}, {}, { emailAddress: string }>, res: Response) => {
+        res.send({Message: "Account balance: " + blockChain.getAccountBalance(req.body.emailAddress)});
+    });
+
+    app.post('/addTransaction', (req: Request<{}, {}, {
+        sender: string,
+        receiver: string,
+        amount: number,
+        message: string
+    }>, res: Response) => {
+        let newTransaction = new Transaction(req.body.sender, req.body.receiver, req.body.amount, req.body.message, wallet.getPrivateKey())
+
+        let addingResult = blockChain.addTransaction(newTransaction);
+        if (!addingResult.succeeded) {
+            res.send({message: addingResult.errorMessage});
+            return;
+        }
+
+        broadcast(new Message(MessageType.TRANSACTION_ADDED, newTransaction.toString()))
+        res.send({message: "Adding transaction succeeded"});
+    })
 
     app.listen(httpPort, () => console.log("Listening HTTP on port: " + httpPort));
 }

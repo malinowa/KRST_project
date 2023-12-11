@@ -5,7 +5,8 @@ export enum MessageType {
     LOG_INFORMATION = 1,
     VERIFICATION_REQUEST = 2,
     VERIFICATION_RESPONSE = 3,
-    BLOCK_MINED = 4
+    BLOCK_MINED = 4,
+    TRANSACTION_ADDED = 5
 }
 
 export class Message {
@@ -68,5 +69,23 @@ export class Identity {
         this.message = message;
         this.signature = signature;
         this.publicKey = publicKey;
+    }
+}
+
+export class OperationResult {
+    succeeded: boolean;
+    errorMessage: string | null;
+    
+    private constructor(succeeded: boolean, errorMessage: string | null = null) {
+        this.succeeded = succeeded;
+        this.errorMessage = errorMessage;
+    }
+    
+    static Success() {
+        return new OperationResult(true);
+    }
+    
+    static Failure(errorMessage: string) {
+        return new OperationResult(false, errorMessage);
     }
 }

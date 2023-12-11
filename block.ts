@@ -15,6 +15,7 @@ export class Block {
     }
 
     generateVerificationHash(): string {
+        console.log(JSON.stringify(this.transactions));
         return this.generateHash(JSON.stringify(this.transactions));
     }
 
@@ -26,14 +27,15 @@ export class Block {
 
     mine(difficulty: number) {
         const transactionsString = JSON.stringify(this.transactions);
+        console.log(transactionsString);
         this.hash = this.generateHash(transactionsString);
         const desiredBeginOfHash = Array(difficulty + 1).join("0");
 
         while (this.hash.substring(0, difficulty) !== desiredBeginOfHash) {
-            console.log(this.hash);
             this.nonce++;
             this.hash = this.generateHash(transactionsString);
         }
+        console.log(this.previousHash + transactionsString + this.timestamp + this.nonce)
         console.log("Final hash = " + this.hash);
     }
 
@@ -47,9 +49,9 @@ export class Block {
                 previousHash: this.previousHash
             })
     }
-    
+
     static createBlock(block: Block) {
-        const newBlock = new Block(block.transactions, block.previousHash, block.timestamp);
+        const newBlock = new Block(Transaction.copyMany(block.transactions), block.previousHash, block.timestamp);
         newBlock.hash = block.hash;
         newBlock.nonce = block.nonce;
         return newBlock;

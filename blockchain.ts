@@ -26,7 +26,7 @@ export class Blockchain {
     }
 
     mineBlock(minerAddress: string, privateKey: string) {
-        const rewardTransaction = new Transaction(BlockchainAddress, minerAddress, this.blockReward, RewardMessage, privateKey);
+        const rewardTransaction = Transaction.create(BlockchainAddress, minerAddress, this.blockReward, RewardMessage, privateKey);
         this.awaitingTransactions.push(rewardTransaction);
 
         let message = new ForkMessage(this.awaitingTransactions, this.getLastBlock().hash, this.difficulty);
@@ -71,20 +71,17 @@ export class Blockchain {
     }
 
     addTransaction(transactionToAdd: Transaction): OperationResult {
-        //  - czy identyczna transakcja już nie istnieje
+        if (transactionToAdd.sender === transactionToAdd.receiver) {
+            return OperationResult.Failure("Invalid transaction! Cannot send to yourself");
+        }
+
         if (this.transactionExists(transactionToAdd.hash)) {
             return OperationResult.Failure("Invalid transaction! Cannot add transaction that already exists");
         }
 
-        //  - czy wysyłający ma odpowiednie środki
-        // let senderAccountBalance = this.getAccountBalance(transactionToAdd.sender);
-        // if (transactionToAdd.amount > senderAccountBalance) {
-        //     return OperationResult.Failure("Insufficient funds! Cannot add transaction when balance is only " + senderAccountBalance);
-        // }
-
-        //  - czy wysyłający nie wysyła do samego siebie (zbędna informacja do przechowywania w blockchainie)
-        if (transactionToAdd.sender === transactionToAdd.receiver) {
-            return OperationResult.Failure("Invalid transaction! Cannot send to yourself");
+        let senderAccountBalance = this.getAccountBalance(transactionToAdd.sender);
+        if (transactionToAdd.amount > senderAccountBalance) {
+            return OperationResult.Failure("Insufficient funds! Cannot add transaction when balance is only " + senderAccountBalance);
         }
 
         this.awaitingTransactions.push(transactionToAdd);
@@ -114,7 +111,7 @@ export class Blockchain {
                 }
             }
         }
-        
+
         return false;
     }
 

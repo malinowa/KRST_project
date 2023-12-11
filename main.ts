@@ -64,8 +64,7 @@ function initHttpServer(): void {
             const parsedMessage = (JSON.parse(message) as Block);
             const block = Block.createBlock(parsedMessage);
             blockChain.pushBlock(block);
-
-
+            
             const messageToBroadcast = new Message(MessageType.BLOCK_MINED, message);
             broadcast(messageToBroadcast);
 
@@ -91,7 +90,7 @@ function initHttpServer(): void {
         amount: number,
         message: string
     }>, res: Response) => {
-        let newTransaction = new Transaction(req.body.sender, req.body.receiver, req.body.amount, req.body.message, wallet.getPrivateKey())
+        let newTransaction = Transaction.create(req.body.sender, req.body.receiver, req.body.amount, req.body.message, wallet.getPrivateKey())
 
         let addingResult = blockChain.addTransaction(newTransaction);
         if (!addingResult.succeeded) {
@@ -99,7 +98,7 @@ function initHttpServer(): void {
             return;
         }
 
-        broadcast(new Message(MessageType.TRANSACTION_ADDED, newTransaction.toString()))
+        broadcast(new Message(MessageType.TRANSACTION_ADDED, JSON.stringify(newTransaction)));
         res.send({message: "Adding transaction succeeded"});
     })
 
@@ -153,12 +152,12 @@ function initMessageHandler(ws: WebSocket) {
             }
                 break;
             case MessageType.VERIFICATION_RESPONSE: {
-                const remoteSocket = getRemoteSocketByWebSocket(ws)!;
+                let remoteSocket = getRemoteSocketByWebSocket(ws)!;
                 handleVerificationResponse(remoteSocket, parsedMessage.data as boolean);
             }
                 break;
             case MessageType.BLOCK_MINED: {
-                const block = Block.createBlock(JSON.parse(parsedMessage.data) as Block);
+                let block = Block.createBlock(JSON.parse(parsedMessage.data) as Block);
                 if (!blockChain.verifyBlock(block)) {
                     return;
                 }
@@ -166,6 +165,12 @@ function initMessageHandler(ws: WebSocket) {
                 blockChain.pushBlock(block);
                 blockChain.stopMining();
             }
+                break;
+            case MessageType.TRANSACTION_ADDED: {
+                let transaction = Transaction.copy(JSON.parse(parsedMessage.data) as Transaction);
+                blockChain.awaitingTransactions.push(transaction);
+            }
+                break;
         }
     });
 }

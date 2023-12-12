@@ -1,5 +1,5 @@
 import {Block} from "./block";
-import {ForkMessage} from "./messages";
+import {ForkMessage} from "../wrappers/messages";
 
 let block: Block;
 

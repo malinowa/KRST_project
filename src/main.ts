@@ -4,13 +4,14 @@ import {Server, WebSocket} from "ws"
 import dotenv from 'dotenv';
 import colorizer from "json-colorizer";
 
-import {Identity, Message, MessageType, NewPeer, P2PResponse, RemoteSocket} from "./wrappers";
-import {Wallet} from "./wallet";
+import {Wallet} from "./core/wallet";
 import {Configuration} from "./configuration";
-import {Blockchain} from "./blockchain";
-import {Block} from "./block";
+import {Blockchain} from "./core/blockchain";
+import {Block} from "./core/block";
 import {fork} from "child_process";
-import {Transaction} from "./transaction";
+import {Transaction} from "./core/transaction";
+import {Identity, Message, MessageType} from "./wrappers/messages";
+import {NewPeer, P2PResponse, RemoteSocket} from "./wrappers/communications";
 
 dotenv.config();
 
@@ -59,12 +60,11 @@ function initHttpServer(): void {
     });
 
     app.post('/mine', (_: Request, res: Response) => {
-        blockChain.worker = fork('./miner.ts', {serialization: "advanced"});
+        blockChain.worker = fork('./src/core/miner.ts', {serialization: "advanced"});
         blockChain.worker.on('message', (message: string) => {
-            const parsedMessage = (JSON.parse(message) as Block);
-            const block = Block.createBlock(parsedMessage);
+            const block = Block.copy(JSON.parse(message) as Block);
             blockChain.pushBlock(block);
-            
+
             const messageToBroadcast = new Message(MessageType.BLOCK_MINED, message);
             broadcast(messageToBroadcast);
 
@@ -157,13 +157,8 @@ function initMessageHandler(ws: WebSocket) {
             }
                 break;
             case MessageType.BLOCK_MINED: {
-                let block = Block.createBlock(JSON.parse(parsedMessage.data) as Block);
-                if (!blockChain.verifyBlock(block)) {
-                    return;
-                }
-
-                blockChain.pushBlock(block);
-                blockChain.stopMining();
+                let block = Block.copy(JSON.parse(parsedMessage.data) as Block);
+                handleBlockMined(block);
             }
                 break;
             case MessageType.TRANSACTION_ADDED: {
@@ -182,6 +177,12 @@ function handleVerificationRequest(webSocket: WebSocket, identity: Identity) {
     write(webSocket, responseMessage);
 }
 
+function getRemoteSocketByWebSocket(webSocket: WebSocket): RemoteSocket | undefined {
+    return sockets.find((socket) => {
+        return JSON.stringify(socket.webSocket) == JSON.stringify(webSocket);
+    })
+}
+
 function handleVerificationResponse(socket: RemoteSocket, result: boolean) {
     verificationResults.set(socket!, result);
     if (verificationResults.size == sockets.length) {
@@ -196,10 +197,13 @@ function handleVerificationResponse(socket: RemoteSocket, result: boolean) {
     }
 }
 
-function getRemoteSocketByWebSocket(webSocket: WebSocket): RemoteSocket | undefined {
-    return sockets.find((socket) => {
-        return JSON.stringify(socket.webSocket) == JSON.stringify(webSocket);
-    })
+function handleBlockMined(block: Block) {
+    if (!blockChain.verifyBlock(block)) {
+        return;
+    }
+
+    blockChain.pushBlock(block);
+    blockChain.stopMining();
 }
 
 function initErrorHandler(ws: WebSocket) {

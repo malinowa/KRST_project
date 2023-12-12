@@ -1,8 +1,9 @@
 import {Block} from "./block";
 import {Transaction} from "./transaction";
 import {ChildProcess} from "child_process";
-import {ForkMessage} from "./messages";
-import {OperationResult} from "./wrappers";
+import {ForkMessage} from "../wrappers/messages";
+
+import {OperationResult} from "../wrappers/results";
 
 const GenesisBlock: Block = new Block([], "", (new Date("November 19, 1335 15:00:00")).toISOString());
 GenesisBlock.hash = GenesisBlock.generateHash(JSON.stringify([]));
@@ -21,8 +22,8 @@ export class Blockchain {
         this.blockReward = blockReward;
     }
 
-    getLastBlock() {
-        return this.chain[this.chain.length - 1];
+    pushBlock(block: Block) {
+        this.chain.push(block);
     }
 
     mineBlock(minerAddress: string, privateKey: string) {
@@ -31,11 +32,10 @@ export class Blockchain {
 
         let message = new ForkMessage(this.awaitingTransactions, this.getLastBlock().hash, this.difficulty);
         this.worker.send(message.toString());
-        console.log("Data sent to miner thread")
     }
 
-    pushBlock(block: Block) {
-        this.chain.push(block);
+    getLastBlock() {
+        return this.chain[this.chain.length - 1];
     }
 
     stopMining() {
@@ -88,6 +88,18 @@ export class Blockchain {
         return OperationResult.Success();
     }
 
+    transactionExists(hash: string): boolean {
+        for (let block of this.chain) {
+            for (let trans of block.transactions) {
+                if (trans.hash === hash) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     getAccountBalance(mailAddress: string): number {
         let balance = 0;
         for (let block of this.chain) {
@@ -101,18 +113,6 @@ export class Blockchain {
         }
 
         return balance;
-    }
-
-    transactionExists(hash: string): boolean {
-        for (let block of this.chain) {
-            for (let trans of block.transactions) {
-                if (trans.hash === hash) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     displayCurrentState() {

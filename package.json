@@ -2,7 +2,7 @@
   "name": "client",
   "version": "1.0.0",
   "scripts": {
-    "start": "ts-node-esm main.ts"
+    "start": "ts-node-esm src/main.ts"
   },
   "devDependencies": {
     "@types/body-parser": "^1.19.4",

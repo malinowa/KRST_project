@@ -70,7 +70,7 @@ export class Blockchain {
         return true;
     }
 
-    addTransaction(transactionToAdd: Transaction): OperationResult {
+    addTransactionWithVerification(transactionToAdd: Transaction): OperationResult {
         if (transactionToAdd.sender === transactionToAdd.receiver) {
             return OperationResult.Failure("Invalid transaction! Cannot send to yourself");
         }

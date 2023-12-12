@@ -92,7 +92,7 @@ function initHttpServer(): void {
     }>, res: Response) => {
         let newTransaction = Transaction.create(req.body.sender, req.body.receiver, req.body.amount, req.body.message, wallet.getPrivateKey())
 
-        let addingResult = blockChain.addTransaction(newTransaction);
+        let addingResult = blockChain.addTransactionWithVerification(newTransaction);
         if (!addingResult.succeeded) {
             res.send({message: addingResult.errorMessage});
             return;
@@ -101,6 +101,11 @@ function initHttpServer(): void {
         broadcast(new Message(MessageType.TRANSACTION_ADDED, JSON.stringify(newTransaction)));
         res.send({message: "Adding transaction succeeded"});
     })
+
+    app.get('/blockchainState', (_: Request, res: Response) => {
+        res.send(JSON.stringify(blockChain.displayCurrentState()));
+    });
+
 
     app.listen(httpPort, () => console.log("Listening HTTP on port: " + httpPort));
 }
@@ -163,7 +168,7 @@ function initMessageHandler(ws: WebSocket) {
                 break;
             case MessageType.TRANSACTION_ADDED: {
                 let transaction = Transaction.copy(JSON.parse(parsedMessage.data) as Transaction);
-                blockChain.awaitingTransactions.push(transaction);
+                blockChain.addTransactionWithVerification(transaction);
             }
                 break;
         }

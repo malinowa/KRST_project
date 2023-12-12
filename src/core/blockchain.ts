@@ -80,7 +80,8 @@ export class Blockchain {
         }
 
         let senderAccountBalance = this.getAccountBalance(transactionToAdd.sender);
-        if (transactionToAdd.amount > senderAccountBalance) {
+        let commissionedValue = this.getValueOfCommissionedTransactions(transactionToAdd.sender);
+        if (transactionToAdd.amount > senderAccountBalance || commissionedValue + transactionToAdd.amount > senderAccountBalance) {
             return OperationResult.Failure("Insufficient funds! Cannot add transaction when balance is only " + senderAccountBalance);
         }
 
@@ -109,6 +110,17 @@ export class Blockchain {
                 } else if (trans.receiver === mailAddress) {
                     balance += trans.amount;
                 }
+            }
+        }
+
+        return balance;
+    }
+
+    getValueOfCommissionedTransactions(mailAddress: string): number {
+        let balance = 0;
+        for (let trans of this.awaitingTransactions) {
+            if (trans.sender === mailAddress) {
+                balance += trans.amount;
             }
         }
 

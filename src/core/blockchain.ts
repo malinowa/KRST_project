@@ -46,14 +46,54 @@ export class Blockchain {
         }
     }
 
-    verifyBlock(block: Block) {
-        const isHashCorrect = block.generateVerificationHash() === block.hash;
-        const isPreviousHashCorrect = this.getLastBlock().hash === block.previousHash;
+    verifyBlock(minedBlock: Block, lastBlock: Block) {
+        const isHashCorrect = minedBlock.generateVerificationHash() === minedBlock.hash;
+        const isPreviousHashCorrect = lastBlock.hash === minedBlock.previousHash;
 
         const desiredBeginOfHash = Array(this.difficulty + 1).join("0");
-        const proofOfWorkResult = block.hash.substring(0, this.difficulty) === desiredBeginOfHash;
+        const proofOfWorkResult = minedBlock.hash.substring(0, this.difficulty) === desiredBeginOfHash;
 
         return isHashCorrect && isPreviousHashCorrect && proofOfWorkResult;
+    }
+
+
+    adjustAndVerifyBlockchain(blocks: Array<Block>) {
+        const commonBlock = blocks.shift();
+        let index = this.chain.indexOf(commonBlock!);
+
+        let previousBlock = commonBlock;
+
+        for (let block of blocks) {
+            if (!this.verifyBlock(block, previousBlock!)) {
+                return;
+            }
+
+            this.chain.splice(index, 1, block);
+            previousBlock = this.chain[this.chain.length - 1];
+        }
+    }
+
+    checkIfBlockExists(block: Block): boolean {
+        return this.chain.includes(block);
+    }
+
+    getPreviousBlockFrom(block: Block): Block | undefined {
+        const blockIndex = this.chain.findIndex((element: Block) => block.hash === element.hash);
+        return blockIndex === 0 ? undefined : this.chain[blockIndex - 1];
+    }
+
+    getSubchainFrom(block: Block, includeFirst: boolean = true): Array<Block> {
+        const blockIndex = this.chain.findIndex((element: Block) => block.hash === element.hash);
+        return this.chain.slice(includeFirst ? blockIndex : blockIndex + 1);
+    }
+
+    calculateProofOfWork(block: Block | Array<Block>) {
+        // return block.transactions.length * this.difficulty;
+        if (block instanceof Block) {
+            return block.transactions.length * this.difficulty;
+        } else {
+            return block.reduce((acc, curr) => acc + curr.transactions.length * this.difficulty, 0);
+        }
     }
 
     verifyIntegrity(): boolean {

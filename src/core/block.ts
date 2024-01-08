@@ -54,4 +54,12 @@ export class Block {
         newBlock.nonce = block.nonce;
         return newBlock;
     }
+
+    static copyMany(blocks: Array<Block>): Array<Block> {
+        const copiedArray = new Array<Block>();
+        for (let block of blocks) {
+            copiedArray.push(this.copy(block));
+        }
+        return copiedArray;
+    }
 }

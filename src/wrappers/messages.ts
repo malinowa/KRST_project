@@ -22,7 +22,10 @@ export enum MessageType {
     VERIFICATION_REQUEST = 2,
     VERIFICATION_RESPONSE = 3,
     BLOCK_MINED = 4,
-    TRANSACTION_ADDED = 5
+    TRANSACTION_ADDED = 5,
+    CHECK_IF_BLOCK_EXISTS = 6,
+    INSERT_LACKING_BLOCKS = 7,
+    BLOCK_NOT_FOUND = 8
 }
 
 export class Message {

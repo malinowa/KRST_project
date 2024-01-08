@@ -65,7 +65,7 @@ function initHttpServer(): void {
             const block = Block.copy(JSON.parse(message) as Block);
             blockChain.pushBlock(block);
 
-            const messageToBroadcast = new Message(MessageType.BLOCK_MINED, message);
+            const messageToBroadcast = new Message(MessageType.BLOCK_MINED, JSON.stringify(block));
             broadcast(messageToBroadcast);
 
             blockChain.stopMining();
@@ -162,8 +162,13 @@ function initMessageHandler(ws: WebSocket) {
             }
                 break;
             case MessageType.BLOCK_MINED: {
-                let block = Block.copy(JSON.parse(parsedMessage.data) as Block);
-                handleBlockMined(block);
+                const message = JSON.parse(parsedMessage.data) as Block;
+                let block = Block.copy(message);
+
+                const isSuccessfullyVerified = handleBlockMined(block);
+                if (!isSuccessfullyVerified) {
+                    synchroniseBlockchain(getRemoteSocketByWebSocket(ws)!);
+                }
             }
                 break;
             case MessageType.TRANSACTION_ADDED: {
@@ -171,8 +176,61 @@ function initMessageHandler(ws: WebSocket) {
                 blockChain.addTransactionWithVerification(transaction);
             }
                 break;
+            case MessageType.CHECK_IF_BLOCK_EXISTS: {
+                const block = Block.copy(JSON.parse(parsedMessage.data) as Block);
+                const isBlockFound = blockChain.checkIfBlockExists(block);
+
+                const websocket = getRemoteSocketByWebSocket(ws)!;
+                if (isBlockFound) {
+                    sendBlocksToInsert(block, websocket);
+                } else {
+                    handleCommonBlockNotFound(block, websocket);
+                }
+            }
+                break;
+            case MessageType.INSERT_LACKING_BLOCKS: {
+                const subchain = Block.copyMany(JSON.parse(parsedMessage.data) as Array<Block>);
+                const supplierPoW = blockChain.calculateProofOfWork(subchain);
+                const thisPoW = blockChain.calculateProofOfWork(blockChain.getSubchainFrom(subchain[0], true));
+
+                if (supplierPoW >= thisPoW) {
+                    blockChain.adjustAndVerifyBlockchain(subchain);
+                }
+            }
+                break;
+            case MessageType.BLOCK_NOT_FOUND: {
+                const block = Block.copy(JSON.parse(parsedMessage.data) as Block);
+                const previousBlock = blockChain.getPreviousBlockFrom(block);
+                
+                if (previousBlock === undefined){
+                    throw "You broke the code";
+                }
+
+                findLastCommonBlock(getRemoteSocketByWebSocket(ws)!, previousBlock);
+            }
         }
     });
+}
+
+function handleCommonBlockNotFound(block: Block, remoteSocket: RemoteSocket) {
+    const messageToSend = new Message(MessageType.BLOCK_NOT_FOUND, JSON.stringify(block))
+    write(remoteSocket.webSocket, messageToSend);
+}
+
+function sendBlocksToInsert(block: Block, remoteSocket: RemoteSocket) {
+    const subchain = blockChain.getSubchainFrom(block);
+    const messageToSend = new Message(MessageType.INSERT_LACKING_BLOCKS, JSON.stringify(subchain));
+    write(remoteSocket.webSocket, messageToSend);
+}
+
+function synchroniseBlockchain(socket: RemoteSocket) {
+    const blockToSend = blockChain.chain[blockChain.chain.length - 2];
+    findLastCommonBlock(socket, blockToSend);
+}
+
+function findLastCommonBlock(socket: RemoteSocket, commonBlockCandidate: Block) {
+    const message = new Message(MessageType.CHECK_IF_BLOCK_EXISTS, JSON.stringify(commonBlockCandidate));
+    write(socket.webSocket, message);
 }
 
 function handleVerificationRequest(webSocket: WebSocket, identity: Identity) {
@@ -202,13 +260,15 @@ function handleVerificationResponse(socket: RemoteSocket, result: boolean) {
     }
 }
 
-function handleBlockMined(block: Block) {
-    if (!blockChain.verifyBlock(block)) {
-        return;
+function handleBlockMined(block: Block): boolean {
+    if (!blockChain.verifyBlock(block, blockChain.getLastBlock())) {
+        return false;
     }
 
     blockChain.pushBlock(block);
     blockChain.stopMining();
+
+    return true;
 }
 
 function initErrorHandler(ws: WebSocket) {

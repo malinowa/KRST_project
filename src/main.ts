@@ -12,6 +12,7 @@ import {fork} from "child_process";
 import {Transaction} from "./core/transaction";
 import {Identity, Message, MessageType} from "./wrappers/messages";
 import {NewPeer, P2PResponse, RemoteSocket} from "./wrappers/communications";
+import {BlockChainState} from "./wrappers/results";
 
 dotenv.config();
 
@@ -104,6 +105,26 @@ function initHttpServer(): void {
 
     app.get('/blockchainState', (_: Request, res: Response) => {
         res.send(JSON.stringify(blockChain.displayCurrentState()));
+    });
+
+    app.post('/initChainState', (req: Request<{}, {}, {
+        chain: Object[],
+        difficulty: number,
+        blockReward: number,
+        transactions: Object[]
+    }>, res: Response) => { 
+        let chain = Array<Block>();
+        for (let block of req.body.chain){
+            chain.push(Block.copy(block as Block));
+        }
+        
+        let transactions = Array<Transaction>();
+        for (let transaction of req.body.transactions) {
+            transactions.push(Transaction.copy(transaction as Transaction));
+        }
+
+        blockChain.recreateState(BlockChainState.create(chain, req.body.difficulty, req.body.blockReward, transactions));
+        res.send({message: "Recreating state succeeded"});
     });
 
 
@@ -201,8 +222,8 @@ function initMessageHandler(ws: WebSocket) {
             case MessageType.BLOCK_NOT_FOUND: {
                 const block = Block.copy(JSON.parse(parsedMessage.data) as Block);
                 const previousBlock = blockChain.getPreviousBlockFrom(block);
-                
-                if (previousBlock === undefined){
+
+                if (previousBlock === undefined) {
                     throw "You broke the code";
                 }
 

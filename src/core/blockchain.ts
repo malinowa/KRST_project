@@ -3,7 +3,7 @@ import {Transaction} from "./transaction";
 import {ChildProcess} from "child_process";
 import {ForkMessage} from "../wrappers/messages";
 
-import {OperationResult} from "../wrappers/results";
+import {BlockChainState, OperationResult} from "../wrappers/results";
 
 const GenesisBlock: Block = new Block([], "", (new Date("November 19, 1335 15:00:00")).toISOString());
 GenesisBlock.hash = GenesisBlock.generateHash(JSON.stringify([]));
@@ -59,7 +59,7 @@ export class Blockchain {
 
     adjustAndVerifyBlockchain(blocks: Array<Block>) {
         const commonBlock = blocks.shift();
-        let index = this.chain.indexOf(commonBlock!);
+        let index = this.chain.findIndex((b) => b.hash === commonBlock!.hash);
 
         let previousBlock = commonBlock;
 
@@ -68,13 +68,13 @@ export class Blockchain {
                 return;
             }
 
-            this.chain.splice(index, 1, block);
-            previousBlock = this.chain[this.chain.length - 1];
+            this.chain.splice(index + 1, 1, block);
+            previousBlock = this.chain[index + 1];
         }
     }
 
     checkIfBlockExists(block: Block): boolean {
-        return this.chain.includes(block);
+        return this.chain.find((b) => b.hash === block.hash) !== undefined;
     }
 
     getPreviousBlockFrom(block: Block): Block | undefined {
@@ -88,7 +88,6 @@ export class Blockchain {
     }
 
     calculateProofOfWork(block: Block | Array<Block>) {
-        // return block.transactions.length * this.difficulty;
         if (block instanceof Block) {
             return block.transactions.length * this.difficulty;
         } else {
@@ -168,11 +167,13 @@ export class Blockchain {
     }
 
     displayCurrentState() {
-        return {
-            chain: this.chain,
-            difficulty: this.difficulty,
-            blockReward: this.blockReward,
-            transactions: this.awaitingTransactions
-        }
+        return BlockChainState.fromBlockchain(this);
+    }
+
+    recreateState(state: BlockChainState) {
+        this.chain = state.chain;
+        this.awaitingTransactions = state.transactions;
+        this.difficulty = state.difficulty;
+        this.blockReward = state.blockReward;
     }
 }
